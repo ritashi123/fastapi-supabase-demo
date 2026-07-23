@@ -7,6 +7,8 @@ from models.book_models import (
     BookResponse,
     BookActionResponse
 )
+from dependencies import CurrentAdmin
+
 
 router = APIRouter(
     prefix='/books',
@@ -69,7 +71,7 @@ def get_book_by_id(book_id: int):
     response_model=BookActionResponse,
     status_code=status.HTTP_201_CREATED
 )
-def create_book(book: BookCreate):
+def create_book(book: BookCreate, current_admin: CurrentAdmin):
     book_data = book.model_dump()
     try:
         response = (
@@ -101,7 +103,7 @@ def create_book(book: BookCreate):
     response_model=BookActionResponse,
     status_code=status.HTTP_200_OK
 )
-def update_book(book_id: int, book: BookUpdate):
+def update_book(book_id: int, book: BookUpdate, current_admin: CurrentAdmin):
     update_book = book.model_dump()
     try:
         response = (
@@ -134,7 +136,7 @@ def update_book(book_id: int, book: BookUpdate):
     response_model=BookActionResponse,
     status_code=status.HTTP_200_OK
 )
-def patch_book(book_id: int, book: BookPatch):
+def patch_book(book_id: int, book: BookPatch, current_admin: CurrentAdmin):
     patch_book = book.model_dump(
         exclude_unset=True,
         exclude_none=True
@@ -175,7 +177,7 @@ def patch_book(book_id: int, book: BookPatch):
     response_model=BookActionResponse,
     status_code=status.HTTP_200_OK
 )
-def delete_book(book_id: int):
+def delete_book(book_id: int, current_admin: CurrentAdmin):
     try:
         response = (
             supabase
@@ -197,6 +199,6 @@ def delete_book(book_id: int):
             detail="Book not Found"
         )
     return {
-        "message":"Book Deleted Successfully",
-        "book":response.data[0]
+        "message": "Book Deleted Successfully",
+        "book": response.data[0]
     }

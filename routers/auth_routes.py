@@ -1,20 +1,32 @@
 from fastapi import APIRouter, HTTPException, status
-from supabase_auth import UserResponse
 from database import supabase
 from models.user_models import (
     UserRegister,
     UserLogin,
-    UserActionResponse
+    UserActionResponse,
+    TokenResponse,
+    UserResponse
 )
 from security import (
     hash_password,
-    verify_password
+    verify_password,
+    create_access_token
 )
+from dependencies import CurrentUser
 
 router = APIRouter(
     prefix='/auth',
     tags=["Auth"]
 )
+
+
+@router.get(
+    '/me',
+    response_model=UserResponse,
+    status_code=status.HTTP_200_OK
+)
+def get_my_profile(current_user: CurrentUser):
+    return current_user
 
 
 @router.post(
@@ -88,16 +100,12 @@ def register_user(user: UserRegister):
 
 
 @router.post(
-     '/login',
-     response_model=UserActionResponse,
-        status_code=status.HTTP_200_OK
-) 
+    '/login',
+    response_model=TokenResponse,
+    status_code=status.HTTP_200_OK
+)
 def login_user(user: UserLogin):
-    normalized_email = (
-        str(user.email)
-        .strip()
-        .lower()
-    )
+    normalized_email = str(user.email).strip().lower()
     try:
         user_response = (
             supabase
@@ -107,7 +115,7 @@ def login_user(user: UserLogin):
             .execute()
         )
     except Exception as error:
-        print("Login error:", error)
+        print("Login error: ", error)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to fetch user"
@@ -119,35 +127,38 @@ def login_user(user: UserLogin):
         )
     stored_user = user_response.data[0]
     try:
-        is_valid_password = verify_password(user.password, stored_user["password_hash"])
+        is_valid_password = verify_password(
+            user.password, stored_user["password_hash"]
+        )
     except Exception as error:
-        print("Password verification error:", error)
+        print("Password verify error:", error)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to login user"
+            detail="failed to login user"
         )
+
     if not is_valid_password:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password"
         )
+
     if not stored_user["is_active"]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Account is in inactive state"
-        ) 
-    safe_user ={
-        "id": stored_user["id"],
-        "full_name": stored_user["full_name"],
-        "email": stored_user["email"],
-        "role": stored_user["role"],
-        "is_active": stored_user["is_active"],
-        "created_at": stored_user["created_at"]     
-    }  
+        )
+
+    try:
+        access_token = create_access_token(user_id=str(stored_user["id"]))
+    except Exception as error:
+        print("Access token error:", error)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Unable to complete login"
+        )
 
     return {
-        "message": "Login successful",
-        "user": safe_user,
-    }                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        
-   
-   
+        "access_token": access_token,
+        "token_type": "bearer"
+    }
